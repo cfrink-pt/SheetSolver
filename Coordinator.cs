@@ -8,6 +8,57 @@ using FormsView = System.Windows.Forms.View;
 
 namespace SheetSolver
 {
+    public class LoadingPopup : IDisposable
+    {
+        private Form _form;
+        private Label _label;
+
+        public LoadingPopup(string message = "Processing...", string title = "Please Wait")
+        {
+            _form = new Form()
+            {
+                Width = 200,
+                Height = 100,
+                Text = title,
+                StartPosition = FormStartPosition.CenterScreen,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ControlBox = false
+            };
+
+            _label = new Label()
+            {
+                Text = message,
+                AutoSize = false,
+                Dock = DockStyle.Fill
+            };
+
+            _form.Controls.Add(_label);
+        }
+
+        public void Show()
+        {
+            _form.Show();
+            _form.Refresh();
+        }
+
+        public void Close()
+        {
+            _form.Close();
+        }
+
+        public void UpdateMessage(string message)
+        {
+            _label.Text = message;
+            _form.Refresh();
+        }
+
+        public void Dispose()
+        {
+            _form?.Dispose();
+        }
+    }
     class Coordinator
     {
 
@@ -18,10 +69,19 @@ namespace SheetSolver
             try
             {
                 // first, we initialize the drawing.
-                InitializeDrawingFromPartDoc(mgr);
+                using (var popup = new LoadingPopup("Initializing drawing..."))
+                {
+                    popup.Show();
+                    InitializeDrawingFromPartDoc(mgr);
+                }
 
                 // next, we create the hole table
-                CreateHoleTable(mgr);
+                using (var popup = new LoadingPopup("Generating hole table..."))
+                {
+                    popup.Show();
+                    CreateHoleTable(mgr);
+                }
+
             }
             finally
             {

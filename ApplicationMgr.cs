@@ -82,33 +82,30 @@ namespace SheetSolver
 
         public void ClearSubStack()
         {
-            if (this.subStack.Peek() != null)
+            if (this.subStack.Count == 0)  // check count instead of Peek()
             {
-                for (int i = 0; i < subStack.Count; i++)
-                {
-                    object currentRef = subStack.Peek();
-
-                    if (currentRef != null) Marshal.ReleaseComObject(currentRef);
-
-                    subStack.Pop();
-                }
+                return; // nothing to clear, just exit silently
             }
-            else
+
+            while (subStack.Count > 0)  // use while loop, safer than for loop here
             {
-                MessageBox.Show("ClearSubStack(): no references in substack to pop. Populate it with PushSubStack(object o) first.");
-                throw new NullReferenceException("No references in substack to pop.");
+                object currentRef = subStack.Pop();
+                if (currentRef != null) 
+                {
+                    Marshal.ReleaseComObject(currentRef);
+                }
             }
         }
 
         public void TearDown()
         {
-            for (int i = 0; i < mainComStack.Count; i++)
+            while (mainComStack.Count > 0)
             {
-                object currentRef = mainComStack.Peek();
-
-                if (currentRef != null) Marshal.ReleaseComObject(currentRef);
-
-                mainComStack.Pop();
+                object currentRef = mainComStack.Pop();
+                if (currentRef != null)
+                {
+                    Marshal.ReleaseComObject(currentRef);
+                }
             }
         }
     }
