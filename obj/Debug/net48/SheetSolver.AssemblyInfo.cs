@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SheetSolver")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ff642fa174558a28d4bdd09d225be38184a91324")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+784280c351f11bbc8f0a03b5cd020d88c9532040")]
 [assembly: System.Reflection.AssemblyProductAttribute("SheetSolver")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SheetSolver")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

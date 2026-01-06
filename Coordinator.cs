@@ -102,7 +102,9 @@ namespace SheetSolver
                     throw new InvalidOperationException("mainView incorrectly fetched. See CreateHoleTable() within Coordinator and ensure no null references.");
                 }
 
-                // now we have the view selected. Lets initialize the hole table
+                // now we have the view selected. Lets create the hole table
+                // hole table itself handles cleaning up references.
+                // TODO: Overhaul error handling to flag non-planar views to throw exceptions where appropriate.
                 HoleTableEntrance htEntrance = new HoleTableEntrance();
                 htEntrance.DoHoleTable(mgr);                
             }
