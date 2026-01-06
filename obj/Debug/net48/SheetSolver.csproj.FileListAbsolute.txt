@@ -1,0 +1,13 @@
+C:\Users\cfrink\Codebase\SheetSolver\bin\Debug\net48\SheetSolver.exe.config
+C:\Users\cfrink\Codebase\SheetSolver\bin\Debug\net48\SheetSolver.exe
+C:\Users\cfrink\Codebase\SheetSolver\bin\Debug\net48\SheetSolver.pdb
+C:\Users\cfrink\Codebase\SheetSolver\bin\Debug\net48\SolidWorks.Interop.sldworks.dll
+C:\Users\cfrink\Codebase\SheetSolver\bin\Debug\net48\SolidWorks.Interop.swconst.dll
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSolver.csproj.AssemblyReference.cache
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSolver.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSolver.AssemblyInfoInputs.cache
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSolver.AssemblyInfo.cs
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSolver.csproj.CoreCompileInputs.cache
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSol.E462CB12.Up2Date
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSolver.exe
+C:\Users\cfrink\Codebase\SheetSolver\obj\Debug\net48\SheetSolver.pdb
