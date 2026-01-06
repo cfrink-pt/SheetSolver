@@ -1,7 +1,9 @@
 using System;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
+using System.Collections.Generic;
 
 using View = SolidWorks.Interop.sldworks.View;
 using FormsView = System.Windows.Forms.View;
@@ -61,19 +63,21 @@ namespace SheetSolver
     }
     class Coordinator
     {
-
         public void CreateDrawing()
         {
             ApplicationMgr mgr = new ApplicationMgr();
 
             try
             {
+                
                 // first, we initialize the drawing.
                 using (var popup = new LoadingPopup("Initializing drawing..."))
                 {
                     popup.Show();
                     InitializeDrawingFromPartDoc(mgr);
                 }
+
+                /*
 
                 // next, we create the hole table
                 using (var popup = new LoadingPopup("Generating hole table..."))
@@ -82,13 +86,21 @@ namespace SheetSolver
                     CreateHoleTable(mgr);
                 }
 
+                */
+
+                // next, we fetch properties.
+                PropertyManager propMgr = new PropertyManager();
+                using (var popup = new LoadingPopup("Populating properties..."))
+                {
+                    popup.Show();
+                    PopulateProperties(mgr, propMgr);
+                }
             }
             finally
             {
                 Console.WriteLine("Tearing Down Main...");
                 mgr.TearDown();
             }
-
         }
 
         // the goal by the end of this method is to have the drawing opened and first two views placed.
@@ -174,5 +186,89 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
+    
+        private void PopulateProperties(ApplicationMgr mgr, PropertyManager propMgr)
+        {
+            try
+            {
+                propMgr.UserInitials = propMgr.GetUserInitials();
+                propMgr.SurfaceArea = GetSurfaceArea(mgr);
+
+                Console.WriteLine(propMgr.SurfaceArea);
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down substack... (PopulateProperties)");
+                mgr.ClearSubStack();
+            }
+        }
+
+        private double GetSurfaceArea(ApplicationMgr mgr)
+        {
+            try
+            {
+                DrawingDoc swDrawing = (DrawingDoc)mgr.App.ActiveDoc;
+                mgr.PushRef(swDrawing);
+
+                View sheet = (View)swDrawing.GetFirstView();
+                mgr.PushRef(sheet);
+
+                View mainView = (View)sheet.GetNextView();
+                mgr.PushRef(mainView);
+
+                View sideView = (View)mainView.GetNextView();
+                mgr.PushRef(sideView);
+
+                // Clear current selection buffer
+                mgr.Doc.ClearSelection2(true);
+
+                Feature viewFeature = (Feature)swDrawing.FeatureByName(sideView.Name);
+                mgr.PushRef(viewFeature);
+
+                // select the feature directly
+                bool selected = viewFeature.Select2(false, 0);
+
+                Console.ReadLine();
+
+                View surfAreaView = swDrawing.CreateUnfoldedViewAt3(mgr.drawingX*1.5, mgr.drawingY/2, 0, false);
+                mgr.PushRef(surfAreaView);
+
+
+                // get a list of faces to evaluate
+                List<Face2> swFaceList = new List<Face2>(); 
+
+                object[] entityList = (object[])surfAreaView.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Face);
+                foreach (object obj in entityList)
+                {
+                    Entity swEnt = (Entity)obj;
+                    int entType = (int)swEnt.GetType();
+                    if (entType == (int)swSelectType_e.swSelFACES)
+                    {
+                        swFaceList.Add((Face2)swEnt);
+                    }
+                    else
+                    {
+                        Marshal.ReleaseComObject(swEnt);
+                    }
+                }
+
+                double maxArea = 0;
+                foreach (Face2 face in swFaceList)
+                {
+                    double area = face.GetArea();
+                    if (area > maxArea) maxArea = area;
+                    Marshal.ReleaseComObject(face);
+                }
+                swFaceList.Clear();
+
+                return maxArea*1550.0031;
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down substack... (GetSurfaceArea)");
+                mgr.ClearSubStack();
+            }
+        }    
+
     }
 }

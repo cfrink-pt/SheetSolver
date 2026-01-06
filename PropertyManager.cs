@@ -6,12 +6,11 @@ using System.Windows.Forms;
 
 /*
 Properties we can auto-fetch
-
+Drawn By
+Surface Area
 
 Properties we must poll for
-Drawn By (maybe we can pull this from the computer they are on? who knows.)
-System.Security.Principal.WindowsIdentity.GetCurrent().Name;
-
+Features? (insert, bend, weld, coat, etc)
 
 */
 namespace SheetSolver
@@ -19,10 +18,11 @@ namespace SheetSolver
     class PropertyManager
     {
         public string UserInitials { get; set; }
+        public double SurfaceArea { get; set; }
 
         public PropertyManager()
         {
-            UserInitials = GetDrawnBy();
+            
         }
 
         public static bool getRegexValidation(string input, string expression)
@@ -35,16 +35,17 @@ namespace SheetSolver
             return false;
         }
 
-        private string GetDrawnBy()
+        public string GetUserInitials()
         {
             string currentUserName = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
             string pattern = @"PHASE\\([a-zA-Z]{2})";
 
             Match match = Regex.Match(currentUserName, pattern);
 
-            if (!match.Success)
+            if (match.Success)
             {
-                return match.Value.ToUpper();
+                Console.WriteLine("Auto-Fetched user name: " + match.Groups[1].Value.ToUpper());
+                return match.Groups[1].Value.ToUpper();
             }
             else
             {
