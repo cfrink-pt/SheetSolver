@@ -72,10 +72,25 @@ namespace SheetSolver
 
             try
             {
+                // validate doc type before operation
+                if (!mgr.VerifyDocType(swDocumentTypes_e.swDocPART))
+                {
+                    throw new InvalidOperationException($"Invalid Document type.\r\nUser opened \"{Enum.GetName(typeof(swDocumentTypes_e), mgr.Doc.GetType())}\", rather than a swDocPART.");
+                }
+
+                if (MessageBox.Show("Orient your model with the scribe facing the viewer orthogonally. When ready, select 'OK', otherwise, click 'Cancel' and run the macro again.", "Orientation Check", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+                {
+                    throw new UserCancelledException("User cancelled operation: Unprepared");
+                }
+
                 //first, we should validate the part has a valid flat pattern. I dont want to handle creation here.
                 // we should perform a search of the configurations to validate one exists, then throw an error if not.
                 ValidateFlatPattern(mgr);
-                
+
+                // check that properties are filled in on the part.
+                // right now, just validating for scribe value.
+                ValidatePropertiesExist(mgr);
+
                 // initialize the drawing. this step ends with two views created, standard first page stuff.
                 using (var popup = new LoadingPopup("Initializing drawing..."))
                 {
@@ -105,6 +120,62 @@ namespace SheetSolver
             }
         }
 
+        private void ValidatePropertiesExist(ApplicationMgr mgr)
+        {
+            try
+            {
+                Dictionary<string, (int Type, string Value, int ResolvedStatus)> partPropMap = new Dictionary<string, (int Type, string Value, int ResolvedStatus)>();
+
+                ModelDocExtension modelDocExtension = mgr.Doc.Extension;
+                mgr.PushRef(modelDocExtension);
+
+                CustomPropertyManager swPropMgr = modelDocExtension.get_CustomPropertyManager("");
+                mgr.PushRef(swPropMgr);
+
+                object propNamesObj = null;
+                object propTypesObj = null;
+                object propValuesObj = null;
+                object resolvedValsObj = null;
+
+                int result = swPropMgr.GetAll2(
+                    ref propNamesObj,
+                    ref propTypesObj,
+                    ref propValuesObj,
+                    ref resolvedValsObj
+                );
+
+                string[] propNames;
+                int[] propTypes;
+                string[] propValues;
+                int[] resolvedVals;
+                // if properties exist, cast them to arrays
+                if (propNamesObj != null)
+                {
+                    propNames = (string[])propNamesObj;
+                    propTypes = (int[])propTypesObj;
+                    propValues = (string[])propValuesObj;
+                    resolvedVals = (int[])resolvedValsObj;
+
+                    for (int i = 0; i < propNames.Length; i++)
+                    {
+                        // for each property, lets STORE IT. WHOOP.
+                        partPropMap.Add(propNames[i], (propTypes[i], propValues[i], resolvedVals[i]));
+                    }
+                }
+
+
+                var scribeProp = partPropMap["Scribe"];
+                if (PropertyManager.getRegexValidation(scribeProp.Value, " / "))
+                {
+                    throw new InvalidOperationException("Please ensure \"Scribe\" property is populated in " + mgr.Doc.GetTitle() + " before running the macro.");
+                }
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down Substack... (ValidatePropertiesExist)");
+                mgr.ClearSubStack();
+            }
+        }
         private void ValidateFlatPattern(ApplicationMgr mgr)
         {
             try
@@ -148,17 +219,6 @@ namespace SheetSolver
         {
             try
             {
-                if (!mgr.VerifyDocType(swDocumentTypes_e.swDocPART))
-                {
-                    throw new InvalidOperationException($"Invalid Document type.\r\nUser opened \"{Enum.GetName(typeof(swDocumentTypes_e), mgr.Doc.GetType())}\", rather than a swDocPART.");
-                }
-
-                if (MessageBox.Show("Orient your model with the scribe facing the viewer orthogonally. When ready, select 'OK', otherwise, click 'Cancel' and run the macro again.", "Orientation Check", MessageBoxButtons.OKCancel) == DialogResult.Cancel)
-                {
-                    throw new UserCancelledException("User cancelled operation: Unprepared");
-                }
-
-
                 // Create the drawingdoc reference. Push it to the substack for cleanup later.
                 DrawingDoc swDrawing = mgr.CreateAndMoveToDrawing();
                 mgr.PushRef(swDrawing);
@@ -235,6 +295,8 @@ namespace SheetSolver
                 // initialize a new prop manager afterwards.
                 pMgr.UserInitials = pMgr.GetUserInitials();
                 pMgr.SurfaceArea = GetSurfaceArea(mgr);
+                // Getmatdata also fetches and stores whether or not the part is coated, and stores it within the pMgr.
+                pMgr.Material = GetMatData(mgr, pMgr);
 
 
                 //get a new solidworks property manager
@@ -251,6 +313,25 @@ namespace SheetSolver
                 // now, update properties in solidworks and pMgr propmap
                 UpdateProperty(swPropMgr, pMgr, "Drawn By", value: pMgr.UserInitials);
                 UpdateProperty(swPropMgr, pMgr, "Drawing title", value: pMgr.FormatFileNameForDrawingTitle(mgr.Doc.GetTitle()));
+                if (pMgr.CoatStatus)
+                {
+                    UpdateProperty(swPropMgr, pMgr, "Finish", value: "BONE WHITE S/G TEXTURE");                  
+                }
+                else
+                {
+                    UpdateProperty(swPropMgr, pMgr, "Finish", value: "N/A");
+                }
+
+                // update surface area cell
+                EditCell(mgr, pMgr.SurfaceArea + "IN\u00B2", "SURFACE AREA", 0, 1);
+                
+                // update coat cell
+                string coatString = "NO";
+                if (pMgr.CoatStatus == true)
+                {
+                    coatString = "YES";
+                }
+                EditCell(mgr, coatString, "FEATURES", 4, 1);
 
                 // rebuild to populate terminal blocks.
                 bool ret = swDrawing.ForceRebuild3(false);
@@ -295,6 +376,43 @@ namespace SheetSolver
             }
         }
 
+        public void EditCell(ApplicationMgr mgr, string cellInput, string targetString, int rowId, int colID)
+        {
+            try
+            {
+                // grab the table we need to edit.
+                DrawingDoc swDrawing = (DrawingDoc)mgr.App.ActiveDoc;
+                mgr.PushRef(swDrawing);
+
+                View viewSheet = (View)swDrawing.GetFirstView();
+                mgr.PushRef(viewSheet);
+                Console.WriteLine("Sheet fetched: " + viewSheet.Name);
+
+                object[] tableAnnotations = (object[])viewSheet.GetTableAnnotations();
+                
+                foreach (TableAnnotation table in tableAnnotations)
+                {
+                    Console.WriteLine("Evaluating table origin value: " + table.Text[0, 0]);
+                    try
+                    {
+                        if (table.Text[0, 0] == targetString)
+                        {
+                            Console.WriteLine("Successfully found table with origin cell = " + targetString);
+                            table.Text[rowId, colID] = cellInput;
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(table);
+                    }
+                }
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down substack... (EditCell)");
+                mgr.ClearSubStack();
+            }
+        }
         private double GetSurfaceArea(ApplicationMgr mgr)
         {
             try
@@ -353,8 +471,19 @@ namespace SheetSolver
                 }
                 swFaceList.Clear();
 
+                // now we can delete the view.
+                //turn the view into a feature.
+                Feature surfAreaViewFeat = (Feature)swDrawing.FeatureByName(surfAreaView.Name);
+                mgr.PushRef(surfAreaViewFeat);
+
+                ModelDoc2 dwgModelDoc = (ModelDoc2)mgr.App.ActiveDoc;
+                mgr.PushRef(dwgModelDoc);
+                
+                surfAreaViewFeat.Select2(false, 0);
+                dwgModelDoc.DeleteSelection(false);                
+
                 // convert the area from square meters to square inches
-                return maxArea*1550.0031;
+                return Math.Round(maxArea*1550.0031, 2);
             }
             finally
             {
@@ -362,7 +491,35 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }    
+        private string GetMatData(ApplicationMgr mgr, PropertyManager pMgr)
+        {
+            try
+            {
+                PartDoc partDoc = (PartDoc)mgr.Doc;
+                mgr.PushRef(partDoc);
 
+                string matDb;
+                string matName;
+
+                matName = partDoc.GetMaterialPropertyName2("", out matDb);
+                
+                if (PropertyManager.getRegexValidation(matName, "G90-P"))
+                {
+                    pMgr.CoatStatus = true;
+                }
+                else
+                {
+                    Console.WriteLine("Part material evaluation: Non-Coated part.");
+                }
+
+                return matName;
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down substack... (GetMaterial)");
+                mgr.ClearSubStack();
+            }
+        }
         private void StorePropertyMap(ApplicationMgr mgr, PropertyManager pMgr)
         {
             try

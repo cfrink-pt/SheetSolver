@@ -22,6 +22,8 @@ namespace SheetSolver
     {
         public string UserInitials { get; set; }
         public double SurfaceArea { get; set; }
+        public string Material { get; set; }
+        public bool CoatStatus { get; set; }
 
 
         public Dictionary<string, (int Type, string Value, int ResolvedStatus)> propMap { get; set; }
