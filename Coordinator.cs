@@ -7,6 +7,9 @@ using System.Collections.Generic;
 
 using View = SolidWorks.Interop.sldworks.View;
 using FormsView = System.Windows.Forms.View;
+using System.Linq;
+using System.Xml.Schema;
+using System.Windows.Forms.VisualStyles;
 
 namespace SheetSolver
 {
@@ -69,15 +72,16 @@ namespace SheetSolver
 
             try
             {
+                //first, we should validate the part has a valid flat pattern. I dont want to handle creation here.
+                // we should perform a search of the configurations to validate one exists, then throw an error if not.
+                ValidateFlatPattern(mgr);
                 
-                // first, we initialize the drawing.
+                // initialize the drawing. this step ends with two views created, standard first page stuff.
                 using (var popup = new LoadingPopup("Initializing drawing..."))
                 {
                     popup.Show();
                     InitializeDrawingFromPartDoc(mgr);
                 }
-
-                /*
 
                 // next, we create the hole table
                 using (var popup = new LoadingPopup("Generating hole table..."))
@@ -86,14 +90,12 @@ namespace SheetSolver
                     CreateHoleTable(mgr);
                 }
 
-                */
-
                 // next, we fetch properties.
-                PropertyManager propMgr = new PropertyManager();
+                PropertyManager pMgr = new PropertyManager();
                 using (var popup = new LoadingPopup("Populating properties..."))
                 {
                     popup.Show();
-                    PopulateProperties(mgr, propMgr);
+                    PopulateProperties(mgr, pMgr);
                 }
             }
             finally
@@ -103,13 +105,49 @@ namespace SheetSolver
             }
         }
 
-        // the goal by the end of this method is to have the drawing opened and first two views placed.
+        private void ValidateFlatPattern(ApplicationMgr mgr)
+        {
+            try
+            {
+                // first, lets fetch the configurations somehow. Check that configs exist first.
+                int configurationCount = mgr.Doc.GetConfigurationCount();
+
+                if (configurationCount == 0)
+                {
+                    throw new InvalidOperationException("Please ensure your part has a valid \"SM-FLAT-PATTERN\" configuration with the flat pattern feature unsuppressed.");
+                }
+                // so we know there actually are configurations stored, lets fetch the names.
+                string[] configNames = (string[])mgr.Doc.GetConfigurationNames();
+
+                // now lets search the array for a configuration matching "SM-FLAT-PATTERN"
+                bool configMatchFound = false;
+                string flatConfigName = "";
+                foreach (string config in configNames)
+                {
+                    if (config.Contains("SM-FLAT-PATTERN"))
+                    {
+                        configMatchFound = true;
+                        flatConfigName = config;
+                    }
+                }
+                if (configMatchFound == false)
+                {
+                    throw new InvalidOperationException("No valid flat pattern configuration found. Please create a flat pattern configuration titled \"SM-FLAT-PATTERN\" with the flat pattern feature unsuppressed.");
+                }
+
+                mgr.Doc.ShowConfiguration2(flatConfigName);
+            }
+            finally
+            {
+                Console.WriteLine("Tearing Down... (ValidateFlatPattern())");
+                mgr.ClearSubStack();
+            }
+        }
+
         private void InitializeDrawingFromPartDoc(ApplicationMgr mgr)
         {
             try
             {
-                // first validate we have a part opened.
-                mgr.StoreOpenDoc();
                 if (!mgr.VerifyDocType(swDocumentTypes_e.swDocPART))
                 {
                     throw new InvalidOperationException($"Invalid Document type.\r\nUser opened \"{Enum.GetName(typeof(swDocumentTypes_e), mgr.Doc.GetType())}\", rather than a swDocPART.");
@@ -187,19 +225,73 @@ namespace SheetSolver
             }
         }
     
-        private void PopulateProperties(ApplicationMgr mgr, PropertyManager propMgr)
+        private void PopulateProperties(ApplicationMgr mgr, PropertyManager pMgr)
         {
             try
-            {
-                propMgr.UserInitials = propMgr.GetUserInitials();
-                propMgr.SurfaceArea = GetSurfaceArea(mgr);
+            {   
+                StorePropertyMap(mgr, pMgr);
 
-                Console.WriteLine(propMgr.SurfaceArea);
+                // now, begin fetching information. we clear substack in getsurface area so we will need to
+                // initialize a new prop manager afterwards.
+                pMgr.UserInitials = pMgr.GetUserInitials();
+                pMgr.SurfaceArea = GetSurfaceArea(mgr);
+
+
+                //get a new solidworks property manager
+                ModelDoc2 swDrawing = (ModelDoc2)mgr.App.ActiveDoc;
+                mgr.PushRef(swDrawing);
+
+                ModelDocExtension modelDocExtension = swDrawing.Extension;
+                mgr.PushRef(modelDocExtension);
+
+                CustomPropertyManager swPropMgr = modelDocExtension.get_CustomPropertyManager("");
+                mgr.PushRef(swPropMgr);
+                
+
+                // now, update properties in solidworks and pMgr propmap
+                UpdateProperty(swPropMgr, pMgr, "Drawn By", value: pMgr.UserInitials);
+                UpdateProperty(swPropMgr, pMgr, "Drawing title", value: pMgr.FormatFileNameForDrawingTitle(mgr.Doc.GetTitle()));
+
+                // rebuild to populate terminal blocks.
+                bool ret = swDrawing.ForceRebuild3(false);
+                Console.WriteLine("Successfully rebuilt? " + ret);
             }
             finally
             {
                 Console.WriteLine("Tearing down substack... (PopulateProperties)");
                 mgr.ClearSubStack();
+            }
+        }
+
+        public void UpdateProperty(
+            CustomPropertyManager swPropMgr,
+            PropertyManager pMgr,
+            string propertyName,
+            int? type = null,
+            string value = null,
+            int? resolvedStatus = null)
+        {
+            if (pMgr.propMap.ContainsKey(propertyName))
+            {
+                var current = pMgr.propMap[propertyName];
+
+                // Update only the values that were provided (not null)
+                int newType = type ?? current.Type;
+                string newValue = value ?? current.Value;
+                int newResolvedStatus = resolvedStatus ?? current.ResolvedStatus;
+
+                // Update the dictionary
+                pMgr.propMap[propertyName] = (newType, newValue, newResolvedStatus);
+
+                // Push to SolidWorks (only if value changed)
+                if (value != null)
+                {
+                    swPropMgr.Set(propertyName, newValue);
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException($"UpdateProperty() tried to update {propertyName}, but it did not exist within the property list.");
             }
         }
 
@@ -228,8 +320,6 @@ namespace SheetSolver
                 // select the feature directly
                 bool selected = viewFeature.Select2(false, 0);
 
-                Console.ReadLine();
-
                 View surfAreaView = swDrawing.CreateUnfoldedViewAt3(mgr.drawingX*1.5, mgr.drawingY/2, 0, false);
                 mgr.PushRef(surfAreaView);
 
@@ -238,9 +328,11 @@ namespace SheetSolver
                 List<Face2> swFaceList = new List<Face2>(); 
 
                 object[] entityList = (object[])surfAreaView.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Face);
+
                 foreach (object obj in entityList)
                 {
                     Entity swEnt = (Entity)obj;
+
                     int entType = (int)swEnt.GetType();
                     if (entType == (int)swSelectType_e.swSelFACES)
                     {
@@ -261,6 +353,7 @@ namespace SheetSolver
                 }
                 swFaceList.Clear();
 
+                // convert the area from square meters to square inches
                 return maxArea*1550.0031;
             }
             finally
@@ -270,5 +363,26 @@ namespace SheetSolver
             }
         }    
 
+        private void StorePropertyMap(ApplicationMgr mgr, PropertyManager pMgr)
+        {
+            try
+            {
+                ModelDoc2 swDrawing = (ModelDoc2)mgr.App.ActiveDoc;
+                mgr.PushRef(swDrawing);
+
+                ModelDocExtension modelDocExtension = swDrawing.Extension;
+                mgr.PushRef(modelDocExtension);
+
+                CustomPropertyManager swPropMgr = modelDocExtension.get_CustomPropertyManager("");
+                mgr.PushRef(swPropMgr);
+
+                pMgr.StorePropertyMap(swPropMgr);
+            }
+            finally
+            {
+                Console.WriteLine("Tearing Down Substack... (StorePropertyMap())");
+                mgr.ClearSubStack();
+            }
+        }
     }
 }

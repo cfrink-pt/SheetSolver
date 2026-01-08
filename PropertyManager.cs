@@ -3,6 +3,9 @@ using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using System.Collections.Generic;
+using System.IO;
+using System.Windows.Forms.VisualStyles;
 
 /*
 Properties we can auto-fetch
@@ -20,9 +23,12 @@ namespace SheetSolver
         public string UserInitials { get; set; }
         public double SurfaceArea { get; set; }
 
+
+        public Dictionary<string, (int Type, string Value, int ResolvedStatus)> propMap { get; set; }
+
         public PropertyManager()
         {
-            
+            propMap = new Dictionary<string, (int Type, string Value, int ResolvedStatus)>();
         }
 
         public static bool getRegexValidation(string input, string expression)
@@ -35,6 +41,15 @@ namespace SheetSolver
             return false;
         }
 
+        public string FormatFileNameForDrawingTitle(string fileName)
+        {
+            string pattern = @"(?<=H0\d{4}, ).*(?=\.SLD\w{3})";
+
+            Match match = Regex.Match(fileName, pattern);
+
+            return match.Groups[0].ToString().ToUpper();
+        }
+
         public string GetUserInitials()
         {
             string currentUserName = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
@@ -44,7 +59,6 @@ namespace SheetSolver
 
             if (match.Success)
             {
-                Console.WriteLine("Auto-Fetched user name: " + match.Groups[1].Value.ToUpper());
                 return match.Groups[1].Value.ToUpper();
             }
             else
@@ -66,6 +80,38 @@ namespace SheetSolver
 
                 return userInput.ToUpper();
 
+            }
+        }
+    
+        public void StorePropertyMap(CustomPropertyManager swPropMgr)
+        {
+            object propNamesObj = null;
+            object propTypesObj = null;
+            object propValuesObj = null;
+            object resolvedValsObj = null;
+            int result = swPropMgr.GetAll2(
+                ref propNamesObj,
+                ref propTypesObj,
+                ref propValuesObj,
+                ref resolvedValsObj
+            );
+            string[] propNames;
+            int[] propTypes;
+            string[] propValues;
+            int[] resolvedVals;
+            // if properties exist, cast them to arrays
+            if (propNamesObj != null)
+            {
+                propNames = (string[])propNamesObj;
+                propTypes = (int[])propTypesObj;
+                propValues = (string[])propValuesObj;
+                resolvedVals = (int[])resolvedValsObj;
+
+                for (int i = 0; i < propNames.Length; i++)
+                {
+                    // for each property, lets STORE IT. WHOOP.
+                    this.propMap.Add(propNames[i], (propTypes[i], propValues[i], resolvedVals[i]));
+                }
             }
         }
     }

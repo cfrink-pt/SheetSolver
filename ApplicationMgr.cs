@@ -31,6 +31,8 @@ namespace SheetSolver
                 MessageBox.Show("SolidWorks needs to be open before running this macro.");
                 throw;
             }
+
+            StoreOpenDoc();
         }
 
         public DrawingDoc CreateAndMoveToDrawing()
@@ -41,7 +43,7 @@ namespace SheetSolver
             DrawingDoc swDrawing = (DrawingDoc)this.App.ActiveDoc;
             return swDrawing;
         }
-        public void StoreOpenDoc()
+        private void StoreOpenDoc()
         {
             if (this.App.ActiveDoc != null)
             {
