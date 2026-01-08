@@ -323,7 +323,6 @@ namespace SheetSolver
                 }
             }
 
-            Console.WriteLine($"Selected {selectedCount} holes");
             return selectedCount;
         }
     }
@@ -426,16 +425,11 @@ namespace SheetSolver
     
     public int ProcessFaces(List<Face2> faces, SelectData swSelData, double exclusionRadius, UserProgressBar pbar)
     {
-        Console.WriteLine("Extracting geometry from faces...");
         // return a list of holecandidate objects called candidates. 
         List<HoleCandidate> candidates = extractor.ExtractHoleCandidates(faces, pbar);
-        Console.WriteLine($"Found {candidates.Count} circular inner loops");
         
-        Console.WriteLine("Filtering for valid holes...");
         List<HoleCandidate> validHoles = filter.FilterValidHoles(candidates, exclusionRadius);
-        Console.WriteLine($"Identified {validHoles.Count} valid holes");
         
-        Console.WriteLine("Selecting holes...");
         int count = selector.SelectHoles(validHoles, swSelData);
 
         //DebugPrint(validHoles);
@@ -496,7 +490,6 @@ namespace SheetSolver
                 
                 if ((swSelectType_e)selType == swSelectType_e.swSelDRAWINGVIEWS)
                 {
-                    Console.WriteLine("User selected a drawing view. Initializing object.");
                     swView = (SwView)swSelection;
                     swModel.ClearSelection2(true);
                     swSelMgr.DeSelect2(1, -1);

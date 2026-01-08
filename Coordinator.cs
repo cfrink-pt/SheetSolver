@@ -83,12 +83,10 @@ namespace SheetSolver
                     throw new UserCancelledException("User cancelled operation: Unprepared");
                 }
 
-                //first, we should validate the part has a valid flat pattern. I dont want to handle creation here.
                 // we should perform a search of the configurations to validate one exists, then throw an error if not.
                 ValidateFlatPattern(mgr);
-
                 // check that properties are filled in on the part.
-                // right now, just validating for scribe value.
+                // right now, just validating for scribe value. TODO: EXPAND THIS LOGIC AS NECESSARY. 
                 ValidatePropertiesExist(mgr);
 
                 // initialize the drawing. this step ends with two views created, standard first page stuff.
@@ -112,6 +110,14 @@ namespace SheetSolver
                     popup.Show();
                     PopulateProperties(mgr, pMgr);
                 }
+
+                // Initialize DimensionMgr and dimension the two views we have set.
+                DimensionManager dMgr = new DimensionManager();
+                using (var popup = new LoadingPopup("Dimensioning views..."))
+                {
+                    popup.Show();
+                    DimensionViews(mgr, dMgr);
+                }
             }
             finally
             {
@@ -120,6 +126,19 @@ namespace SheetSolver
             }
         }
 
+// Helper methods below here to assist in the coordinator.CreateDrawing routine.
+        private void DimensionViews(ApplicationMgr mgr, DimensionManager dMgr)
+        {
+           try
+            {
+                
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down Substack... (DimensionViews)");
+                mgr.ClearSubStack();
+            }
+        }
         private void ValidatePropertiesExist(ApplicationMgr mgr)
         {
             try
@@ -163,11 +182,34 @@ namespace SheetSolver
                     }
                 }
 
-
-                var scribeProp = partPropMap["Scribe"];
-                if (PropertyManager.getRegexValidation(scribeProp.Value, " / "))
+                try
                 {
-                    throw new InvalidOperationException("Please ensure \"Scribe\" property is populated in " + mgr.Doc.GetTitle() + " before running the macro.");
+                    string scribePropName = "";
+                    foreach (var prop in partPropMap)
+                    {
+                        if(PropertyManager.getRegexValidation(prop.Key, @"(?i)^scribe$"))
+                        {
+                            scribePropName = prop.Key;
+                            break;
+                        }
+                    }
+
+                    // Check if we actually found a scribe property
+                    if (string.IsNullOrEmpty(scribePropName))
+                    {
+                        throw new InvalidOperationException("No valid property found for \"Scribe\". Please ensure your part document has a scribe property (N/A, REQUIRED, REFERENCE, ETC..)");
+                    }
+
+                    var scribeProp = partPropMap[scribePropName];
+
+                    if (PropertyManager.getRegexValidation(scribeProp.Value, " / "))
+                    {
+                        throw new InvalidOperationException("Please ensure \"Scribe\" property is populated in " + mgr.Doc.GetTitle() + " before running the macro.");
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    throw new InvalidOperationException("No valid property found for \"Scribe\". Please ensure your part document has a scribe property (N/A, REQUIRED, REFERENCE, ETC..)");
                 }
             }
             finally
@@ -214,7 +256,6 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
-
         private void InitializeDrawingFromPartDoc(ApplicationMgr mgr)
         {
             try
@@ -237,7 +278,6 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
-
         private void CreateHoleTable(ApplicationMgr mgr)
         {
             try
@@ -284,7 +324,6 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
-    
         private void PopulateProperties(ApplicationMgr mgr, PropertyManager pMgr)
         {
             try
@@ -335,7 +374,6 @@ namespace SheetSolver
 
                 // rebuild to populate terminal blocks.
                 bool ret = swDrawing.ForceRebuild3(false);
-                Console.WriteLine("Successfully rebuilt? " + ret);
             }
             finally
             {
@@ -343,14 +381,7 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
-
-        public void UpdateProperty(
-            CustomPropertyManager swPropMgr,
-            PropertyManager pMgr,
-            string propertyName,
-            int? type = null,
-            string value = null,
-            int? resolvedStatus = null)
+        public void UpdateProperty( CustomPropertyManager swPropMgr, PropertyManager pMgr, string propertyName, int? type = null, string value = null, int? resolvedStatus = null)
         {
             if (pMgr.propMap.ContainsKey(propertyName))
             {
@@ -375,7 +406,6 @@ namespace SheetSolver
                 throw new InvalidOperationException($"UpdateProperty() tried to update {propertyName}, but it did not exist within the property list.");
             }
         }
-
         public void EditCell(ApplicationMgr mgr, string cellInput, string targetString, int rowId, int colID)
         {
             try
@@ -386,18 +416,15 @@ namespace SheetSolver
 
                 View viewSheet = (View)swDrawing.GetFirstView();
                 mgr.PushRef(viewSheet);
-                Console.WriteLine("Sheet fetched: " + viewSheet.Name);
 
                 object[] tableAnnotations = (object[])viewSheet.GetTableAnnotations();
                 
                 foreach (TableAnnotation table in tableAnnotations)
                 {
-                    Console.WriteLine("Evaluating table origin value: " + table.Text[0, 0]);
                     try
                     {
                         if (table.Text[0, 0] == targetString)
                         {
-                            Console.WriteLine("Successfully found table with origin cell = " + targetString);
                             table.Text[rowId, colID] = cellInput;
                         }
                     }
@@ -506,10 +533,6 @@ namespace SheetSolver
                 if (PropertyManager.getRegexValidation(matName, "G90-P"))
                 {
                     pMgr.CoatStatus = true;
-                }
-                else
-                {
-                    Console.WriteLine("Part material evaluation: Non-Coated part.");
                 }
 
                 return matName;

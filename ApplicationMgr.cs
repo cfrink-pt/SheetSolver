@@ -89,14 +89,18 @@ namespace SheetSolver
                 return; // nothing to clear, just exit silently
             }
 
+            int refCount = 0;
             while (subStack.Count > 0)  // use while loop, safer than for loop here
             {
                 object currentRef = subStack.Pop();
                 if (currentRef != null) 
                 {
                     Marshal.ReleaseComObject(currentRef);
+                    refCount++;
                 }
             }
+
+            Console.WriteLine(" " + refCount + " objects released.");
         }
 
         public void TearDown()
