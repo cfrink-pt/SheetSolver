@@ -70,6 +70,9 @@ namespace SheetSolver
         {
             ApplicationMgr mgr = new ApplicationMgr();
 
+            // this first setting is simply to keep dimensions from prompting the user to input a value for a dimension on it's creation.
+            mgr.App.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swInputDimValOnCreate, true);
+
             try
             {
                 // validate doc type before operation
@@ -111,12 +114,10 @@ namespace SheetSolver
                     PopulateProperties(mgr, pMgr);
                 }
 
-                // Initialize DimensionMgr and dimension the two views we have set.
-                DimensionManager dMgr = new DimensionManager();
-                using (var popup = new LoadingPopup("Dimensioning views..."))
+                    using (var popup = new LoadingPopup("Dimensioning views..."))
                 {
                     popup.Show();
-                    DimensionViews(mgr, dMgr);
+                    DimensionViews(mgr);
                 }
             }
             finally
@@ -127,11 +128,38 @@ namespace SheetSolver
         }
 
 // Helper methods below here to assist in the coordinator.CreateDrawing routine.
-        private void DimensionViews(ApplicationMgr mgr, DimensionManager dMgr)
+        private void DimensionViews(ApplicationMgr mgr)
         {
            try
             {
+                // fetch the view I want to evaluate. I think you can do Sheet.GetAllViews()
+                // TODO: Evaluate the feasibility of this. Iterate through each view, dimension
+                // the most we can reasonably dimension on the view, and then cull dims? TBD..
                 
+                DrawingDoc swDrawing = (DrawingDoc)mgr.App.ActiveDoc;
+                mgr.PushRef(swDrawing);
+
+                swDrawing.ActivateSheet("FLAT");
+
+                Sheet sheet = (Sheet)swDrawing.GetCurrentSheet();
+                mgr.PushRef(sheet);
+
+                Object[] views = (Object[])sheet.GetViews();
+
+
+                foreach (View view in views)
+                {
+                    try
+                    {
+                        DimensionManager dMgr = new DimensionManager(view);
+                        Console.WriteLine($"\r\n\r\nView Name: {view.GetName2()}\r\n");
+                        dMgr.ExtractStraightEdgesFromView(mgr, view);
+                    }
+                    finally
+                    {
+                        mgr.PushRef(view);
+                    }
+                }
             }
             finally
             {
