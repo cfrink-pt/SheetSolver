@@ -146,14 +146,23 @@ namespace SheetSolver
 
                 Object[] views = (Object[])sheet.GetViews();
 
+                Dictionary<View, DimensionManager> dimViews = new Dictionary<View, DimensionManager>();
 
                 foreach (View view in views)
                 {
                     try
                     {
                         DimensionManager dMgr = new DimensionManager(view);
+                        dimViews.Add(view, dMgr);
+
                         Console.WriteLine($"\r\n\r\nView Name: {view.GetName2()}\r\n");
                         dMgr.ExtractStraightEdgesFromView(mgr, view);
+
+                        dimEdge[] boundEdges = new dimEdge[4];
+                        boundEdges = dMgr.FindBoundEdges();
+
+                        dMgr.DimensionEdges(mgr, boundEdges[0], boundEdges[1]);
+                        dMgr.DimensionEdges(mgr, boundEdges[2], boundEdges[3]);
                     }
                     finally
                     {

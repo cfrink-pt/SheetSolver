@@ -3,7 +3,6 @@ using SolidWorks.Interop.swconst;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Security.Policy;
 
 namespace SheetSolver
 {
@@ -41,6 +40,10 @@ namespace SheetSolver
         public List<dimEdge> _edges;
         public HashSet<dimEdge> _evaluatedEdges;
         public View _view;
+        public double _xMin { get; set; }
+        public double _xMax { get; set; }
+        public double _yMin { get; set; }
+        public double _yMax { get; set; }
 
         public DimensionManager(View view)
         {
@@ -49,6 +52,7 @@ namespace SheetSolver
             _evaluatedEdges = new HashSet<dimEdge>();
         }
 
+        // extracting straight edges from view also will write to this object's internal "Space" representation
         public void ExtractStraightEdgesFromView(ApplicationMgr mgr, View view)
         {
             try
@@ -91,7 +95,7 @@ namespace SheetSolver
                             lineParams[4] = transformedVector[1];
                             lineParams[5] = transformedVector[2];
 
-                            // Clean up POSITION coordinates (indices 0-2)
+                            // Clean up POSITION coordinates
                             for (int i = 0; i < 3; i++)
                             {
                                 lineParams[i] = Math.Round(lineParams[i], 8);
@@ -101,18 +105,16 @@ namespace SheetSolver
                                 }
                             }
                             
-                            // Clean up DIRECTION components (indices 3-5) with MUCH smaller threshold
-                            // because these are normalized unit vectors
+                            // Clean up DIRECTION components
                             for (int i = 3; i < 6; i++)
                             {
                                 lineParams[i] = Math.Round(lineParams[i], 8);
-                                if (Math.Abs(lineParams[i]) < 1e-15)  // Much smaller threshold!
+                                if (Math.Abs(lineParams[i]) < 1e-15) 
                                 {
                                     lineParams[i] = 0;
                                 }
                             }
 
-                            Console.WriteLine($"Edge {count}\r\n  X: {lineParams[0]} | Y: {lineParams[1]} | Z: {lineParams[2]}\r\n  Dx: {lineParams[3]} | Dy: {lineParams[4]} | Dz: {lineParams[5]}");
                             dimEdge dEdge = new dimEdge
                             {
                                 X1 = lineParams[0],
@@ -122,6 +124,7 @@ namespace SheetSolver
                                 Dz = lineParams[5]
                             };
                             edges.Add(dEdge);
+                            Console.WriteLine($"Edge {count}\r\n  X: {dEdge.X1} | Y: {dEdge.Y1}\r\n  Dx: {dEdge.Dx} | Dy: {dEdge.Dy} | Dz: {dEdge.Dz}");
                         }
                     }
                     else
@@ -133,11 +136,12 @@ namespace SheetSolver
                 if (edges.Count != 0)
                 {
                     this._edges = edges;
+                    StoreBounds(edges);
                 }
                 else
                 {
                     throw new InvalidOperationException("ExtractStraightEdgesFromView failed to fetch valid edge entities from view reference. No valid Edges!");
-                }            
+                }
             }
             finally
             {
@@ -145,7 +149,111 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
-    
+
+        public dimEdge[] FindBoundEdges()
+        {
+            // x edges = [0, 1]
+            // y edges = [2, 3]
+            dimEdge[] boundEdges = new dimEdge[4];
+            
+            bool xMinFound = false;
+            bool xMaxFound = false;
+            bool yMinFound = false;
+            bool yMaxFound = false;
+            foreach (dimEdge edge in this._edges)
+            {
+                if (edge.X1 == this._xMin && !this._evaluatedEdges.Contains(edge) && xMinFound == false)
+                {
+                    xMinFound = true;
+                    this._evaluatedEdges.Add(edge);
+                    boundEdges[0] = edge;
+                    continue;
+                }
+
+                if (edge.X1 == this._xMax && !this._evaluatedEdges.Contains(edge) && xMaxFound == false)
+                {
+                    xMaxFound = true;
+                    this._evaluatedEdges.Add(edge);
+                    boundEdges[1] = edge;
+                    continue;
+                }
+
+                if (edge.Y1 == this._yMin && !this._evaluatedEdges.Contains(edge) && yMinFound == false)
+                {
+                    yMinFound = true;
+                    this._evaluatedEdges.Add(edge);
+                    boundEdges[2] = edge;
+                    continue;
+                }
+
+                if (edge.Y1 == this._yMax && !this._evaluatedEdges.Contains(edge) && yMaxFound == false)
+                {
+                    yMaxFound = true;
+                    this._evaluatedEdges.Add(edge);
+                    boundEdges[3] = edge;
+                    continue;
+                }
+            }
+            return boundEdges;
+        }
+        public void DimensionEdges(ApplicationMgr mgr, dimEdge edge1, dimEdge edge2)
+        {
+            try
+            {
+                ModelDoc2 dwDoc = (ModelDoc2)mgr.App.ActiveDoc;
+                mgr.PushRef(dwDoc);
+
+                dwDoc.Extension.SelectByID2("", "", edge1.X1, edge1.Y1, 0, true, 0, null, 0);
+                dwDoc.Extension.SelectByID2("", "", edge2.X1, edge2.Y1, 0, true, 0, null, 0);
+
+                dwDoc.AddDimension(0, 0, 0);
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down substack...  (DimensionEdges)");
+                mgr.ClearSubStack();
+            }
+        }
+
+        private void StoreBounds(List<dimEdge> edgeStructs)
+        {
+            double xMin = 100;
+            foreach (dimEdge edge in edgeStructs)
+            {
+                double x = edge.X1;
+                if ( edge.X1 < xMin) xMin = x;
+            }
+            this._xMin = xMin;
+            Console.WriteLine("Min x value stored = " + this._xMin);
+
+            double xMax = 0;
+            foreach (dimEdge edge in edgeStructs)
+            {
+                double x = edge.X1;
+                if ( edge.X1 > xMax) xMax = x;
+            }
+            this._xMax = xMax;
+            Console.WriteLine("Max x value stored = " + this._xMax);
+
+            double yMin = 100;
+            foreach (dimEdge edge in edgeStructs)
+            {
+                double y = edge.Y1;
+                if ( edge.Y1 < yMin) yMin = y;
+            }
+            this._yMin = yMin;
+            Console.WriteLine("Min y value stored = " + this._yMin);
+
+            double yMax = 0;
+            foreach (dimEdge edge in edgeStructs)
+            {
+                double y = edge.Y1;
+                if ( edge.Y1 > yMax) yMax = y;
+            }
+            this._yMax = yMax;
+            Console.WriteLine("Max y value stored = " + this._yMax);
+        }
+
         public double[] TransformModelToSheetSpace(ApplicationMgr mgr, View view, double[] modelCoords)
         {
             try
@@ -205,6 +313,7 @@ namespace SheetSolver
 
                 double[] sheetDirection = (double[])sheetVec.ArrayData;
 
+                
                 // NORMALIZE the vector to unit length
                 double magnitude = Math.Sqrt(
                     sheetDirection[0] * sheetDirection[0] +
@@ -217,12 +326,12 @@ namespace SheetSolver
                     sheetDirection[0] /= magnitude;
                     sheetDirection[1] /= magnitude;
                     sheetDirection[2] /= magnitude;
-                    Console.WriteLine($"  After normalize: ({sheetDirection[0]}, {sheetDirection[1]}, {sheetDirection[2]})");
                 }
-                else
+                else 
                 {
                     Console.WriteLine($"  WARNING: Magnitude too small to normalize!");
                 }
+                
 
                 return sheetDirection;
             }
