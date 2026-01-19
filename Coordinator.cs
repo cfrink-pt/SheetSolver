@@ -7,9 +7,7 @@ using System.Collections.Generic;
 
 using View = SolidWorks.Interop.sldworks.View;
 using FormsView = System.Windows.Forms.View;
-using System.Linq;
-using System.Xml.Schema;
-using System.Windows.Forms.VisualStyles;
+
 
 namespace SheetSolver
 {
@@ -148,6 +146,7 @@ namespace SheetSolver
 
                 Dictionary<View, DimensionManager> dimViews = new Dictionary<View, DimensionManager>();
 
+                int viewIndex = 0;
                 foreach (View view in views)
                 {
                     try
@@ -162,7 +161,18 @@ namespace SheetSolver
                         boundEdges = dMgr.FindBoundEdges();
 
                         dMgr.DimensionEdges(mgr, boundEdges[0], boundEdges[1]);
-                        dMgr.DimensionEdges(mgr, boundEdges[2], boundEdges[3]);
+
+                        // really shitty to pass a flag here, but its a bandaid solution for the time being.
+                        // this literally just makes the second view not get y bounds dimensioned because we
+                        // dont care about that dim.
+                        // TODO
+                        if (viewIndex == 0)
+                        {
+                            dMgr.DimensionEdges(mgr, boundEdges[2], boundEdges[3]);
+                        }
+                        
+                        dMgr.ReleaseEdgeRefs();
+                        viewIndex++;
                     }
                     finally
                     {

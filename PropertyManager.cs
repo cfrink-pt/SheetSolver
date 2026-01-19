@@ -45,7 +45,7 @@ namespace SheetSolver
 
         public string FormatFileNameForDrawingTitle(string fileName)
         {
-            string pattern = @"(?<=H0\d{4}, ).*(?=\.SLD\w{3})";
+            string pattern = @"(?<=[Hh]0\d{4}[, ] ?).*(?=\.SLD\w{3})";
 
             Match match = Regex.Match(fileName, pattern);
 

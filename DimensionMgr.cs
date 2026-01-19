@@ -3,6 +3,7 @@ using SolidWorks.Interop.swconst;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Linq;
 
 namespace SheetSolver
 {
@@ -27,13 +28,15 @@ namespace SheetSolver
 
     // decided to go with a record struct so we could store unique xy pairs for 2 points, one for the start and one for the end point in the edge.
     // plus we get fast lookup which is lovely! we will iterate a lot. 
-    public record struct dimEdge(
-        double X1,
-        double Y1,
-        double Dx,
-        double Dy,
-        double Dz
-    );
+    public class dimEdge
+    {
+        public double X1 { get; set; }
+        public double Y1 { get; set; }
+        public double Dx { get; set; }
+        public double Dy { get; set; }
+        public double Dz { get; set; }
+        public Entity EntityRef { get; set; }
+    }
 
     class DimensionManager
     {
@@ -60,79 +63,92 @@ namespace SheetSolver
                 List<dimEdge> edges = new List<dimEdge>();
 
                 int count = 0;
-                object[] entityList = (object[])view.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Edge);
-                foreach (object edge in entityList)
+                object[] faceList = (object[])view.GetVisibleEntities2(null, (int)swViewEntityType_e.swViewEntityType_Face);
+                foreach (object faceObj in faceList)
                 {
-                    Entity edgeEnt = (Entity)edge;
-                    int entType = (int)edgeEnt.GetType();
-                    if (entType == (int)swSelectType_e.swSelEDGES)
+
+                    Face2 face = (Face2)faceObj;
+
+                    object[] loops = (object[])face.GetLoops();
+
+                    foreach (object loopObj in loops)
                     {
-                        // dont forget to cast from ent to edge
-                        Edge swEdge = (Edge)edge;
-                        mgr.PushRef(swEdge);
+                        Loop2 loop = (Loop2)loopObj;
 
-                        Curve edgeCurve = (Curve)swEdge.GetCurve();
-                        mgr.PushRef(edgeCurve);
-
-                        if (edgeCurve.Identity() == (int)swCurveTypes_e.LINE_TYPE)
+                        if (!loop.IsOuter())
                         {
-                            count++;
-
-                            // straight line. lets get a param.
-                            double[] lineParams = new double[6];
-                            lineParams = (double[])edgeCurve.LineParams;
-
-                            double[] transformedLocation = new double[3];
-                            double[] transformedVector = new double[3];
-                            transformedLocation = TransformModelToSheetSpace(mgr, this._view, lineParams);
-                            transformedVector = TransformDirectionModelToSheet(mgr, this._view, lineParams);
-
-                            lineParams[0] = transformedLocation[0];
-                            lineParams[1] = transformedLocation[1];
-                            lineParams[2] = transformedLocation[2];
-
-                            lineParams[3] = transformedVector[0];
-                            lineParams[4] = transformedVector[1];
-                            lineParams[5] = transformedVector[2];
-
-                            // Clean up POSITION coordinates
-                            for (int i = 0; i < 3; i++)
-                            {
-                                lineParams[i] = Math.Round(lineParams[i], 8);
-                                if (Math.Abs(lineParams[i]) < 1e-10)
-                                {
-                                    lineParams[i] = 0;
-                                }
-                            }
-                            
-                            // Clean up DIRECTION components
-                            for (int i = 3; i < 6; i++)
-                            {
-                                lineParams[i] = Math.Round(lineParams[i], 8);
-                                if (Math.Abs(lineParams[i]) < 1e-15) 
-                                {
-                                    lineParams[i] = 0;
-                                }
-                            }
-
-                            dimEdge dEdge = new dimEdge
-                            {
-                                X1 = lineParams[0],
-                                Y1 = lineParams[1],
-                                Dx = lineParams[3],
-                                Dy = lineParams[4],
-                                Dz = lineParams[5]
-                            };
-                            edges.Add(dEdge);
-                            Console.WriteLine($"Edge {count}\r\n  X: {dEdge.X1} | Y: {dEdge.Y1}\r\n  Dx: {dEdge.Dx} | Dy: {dEdge.Dy} | Dz: {dEdge.Dz}");
+                            Marshal.ReleaseComObject(loop);
+                            continue;
                         }
-                    }
-                    else
-                    {
-                        Marshal.ReleaseComObject(edgeEnt);
-                    }
-                }
 
+                        object[] loopEdges = (object[])loop.GetEdges();
+
+                        foreach (object edgeObj in loopEdges)
+                        {
+                            Edge swEdge = (Edge)edgeObj;
+                            Curve edgeCurve = (Curve)swEdge.GetCurve();
+
+                            if (edgeCurve.Identity() == (int)swCurveTypes_e.LINE_TYPE)
+                            {
+                                count++;
+                                // straight line. lets get a param.
+                                double[] lineParams = new double[6];
+                                lineParams = (double[])edgeCurve.LineParams;
+                                double[] transformedLocation = new double[3];
+                                double[] transformedVector = new double[3];
+                                transformedLocation = TransformModelToSheetSpace(mgr, this._view, lineParams);
+                                transformedVector = TransformDirectionModelToSheet(mgr, this._view, lineParams);
+                                lineParams[0] = transformedLocation[0];
+                                lineParams[1] = transformedLocation[1];
+                                lineParams[2] = transformedLocation[2];
+                                lineParams[3] = transformedVector[0];
+                                lineParams[4] = transformedVector[1];
+                                lineParams[5] = transformedVector[2];
+                                // Clean up POSITION coordinates
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    lineParams[i] = Math.Round(lineParams[i], 8);
+                                    if (Math.Abs(lineParams[i]) < 1e-10)
+                                    {
+                                        lineParams[i] = 0;
+                                    }
+                                }
+
+
+                                // Clean up DIRECTION components
+                                for (int i = 3; i < 6; i++)
+                                {
+                                    lineParams[i] = Math.Round(lineParams[i], 8);
+                                    if (Math.Abs(lineParams[i]) < 1e-15) 
+                                    {
+                                        lineParams[i] = 0;
+                                    }
+                                }
+                                dimEdge dEdge = new dimEdge
+                                {
+                                    X1 = lineParams[0],
+                                    Y1 = lineParams[1],
+                                    Dx = lineParams[3],
+                                    Dy = lineParams[4],
+                                    Dz = lineParams[5],
+                                    EntityRef = (Entity)swEdge
+                                };
+                                edges.Add(dEdge);
+                                Console.WriteLine($"Edge {count}\r\n  X: {dEdge.X1} | Y: {dEdge.Y1}\r\n  Dx: {dEdge.Dx} | Dy: {dEdge.Dy} | Dz: {dEdge.Dz}");
+                            }
+                            else
+                            {
+                                Marshal.ReleaseComObject(swEdge);
+                            }
+
+                            Marshal.ReleaseComObject(edgeCurve);
+                        }
+
+                        Marshal.ReleaseComObject(loop);
+                    }
+
+                    Marshal.ReleaseComObject(face);
+                }
                 if (edges.Count != 0)
                 {
                     this._edges = edges;
@@ -152,48 +168,28 @@ namespace SheetSolver
 
         public dimEdge[] FindBoundEdges()
         {
-            // x edges = [0, 1]
-            // y edges = [2, 3]
             dimEdge[] boundEdges = new dimEdge[4];
-            
-            bool xMinFound = false;
-            bool xMaxFound = false;
-            bool yMinFound = false;
-            bool yMaxFound = false;
-            foreach (dimEdge edge in this._edges)
+
+            // Separate edges by orientation first
+            var verticalEdges = new List<dimEdge>();  
+            var horizontalEdges = new List<dimEdge>();
+
+            foreach (var edge in _edges)
             {
-                if (edge.X1 == this._xMin && !this._evaluatedEdges.Contains(edge) && xMinFound == false)
-                {
-                    xMinFound = true;
-                    this._evaluatedEdges.Add(edge);
-                    boundEdges[0] = edge;
-                    continue;
-                }
-
-                if (edge.X1 == this._xMax && !this._evaluatedEdges.Contains(edge) && xMaxFound == false)
-                {
-                    xMaxFound = true;
-                    this._evaluatedEdges.Add(edge);
-                    boundEdges[1] = edge;
-                    continue;
-                }
-
-                if (edge.Y1 == this._yMin && !this._evaluatedEdges.Contains(edge) && yMinFound == false)
-                {
-                    yMinFound = true;
-                    this._evaluatedEdges.Add(edge);
-                    boundEdges[2] = edge;
-                    continue;
-                }
-
-                if (edge.Y1 == this._yMax && !this._evaluatedEdges.Contains(edge) && yMaxFound == false)
-                {
-                    yMaxFound = true;
-                    this._evaluatedEdges.Add(edge);
-                    boundEdges[3] = edge;
-                    continue;
-                }
+                if (Math.Abs(edge.Dy) > Math.Abs(edge.Dx))
+                    verticalEdges.Add(edge);
+                else
+                    horizontalEdges.Add(edge);
             }
+
+            // Find leftmost and rightmost VERTICAL edges (for X dimension)
+            boundEdges[0] = verticalEdges.OrderBy(e => e.X1).First();
+            boundEdges[1] = verticalEdges.OrderByDescending(e => e.X1).First();
+
+            // Find bottom and top HORIZONTAL edges (for Y dimension)
+            boundEdges[2] = horizontalEdges.OrderBy(e => e.Y1).First();
+            boundEdges[3] = horizontalEdges.OrderByDescending(e => e.Y1).First();
+
             return boundEdges;
         }
         public void DimensionEdges(ApplicationMgr mgr, dimEdge edge1, dimEdge edge2)
@@ -202,11 +198,35 @@ namespace SheetSolver
             {
                 ModelDoc2 dwDoc = (ModelDoc2)mgr.App.ActiveDoc;
                 mgr.PushRef(dwDoc);
-
-                dwDoc.Extension.SelectByID2("", "", edge1.X1, edge1.Y1, 0, true, 0, null, 0);
-                dwDoc.Extension.SelectByID2("", "", edge2.X1, edge2.Y1, 0, true, 0, null, 0);
-
-                dwDoc.AddDimension(0, 0, 0);
+        
+                dwDoc.ClearSelection2(true);
+                
+                edge1.EntityRef.Select4(false, null);
+                edge2.EntityRef.Select4(true, null);
+        
+                double dimX, dimY;
+                
+                double totalWidth = _xMax - _xMin;
+                double totalHeight = _yMax - _yMin;
+                double offset = Math.Min(totalWidth, totalHeight) / 5.0;
+                
+                // Check if these are horizontal edges (dimensioning Y bounds)
+                bool isHorizontalEdges = Math.Abs(edge1.Dx) > Math.Abs(edge1.Dy);
+                
+                if (isHorizontalEdges)
+                {
+                    // Y bound dimension - place to the left of the part
+                    dimX = _xMin - offset;
+                    dimY = (edge1.Y1 + edge2.Y1) / 2.0;
+                }
+                else
+                {
+                    // X bound dimension - place above the part
+                    dimX = (edge1.X1 + edge2.X1) / 2.0;
+                    dimY = _yMax + offset;
+                }
+        
+                dwDoc.AddDimension2(dimX, dimY, 0);
             }
             finally
             {
@@ -338,6 +358,18 @@ namespace SheetSolver
             finally
             {
                 mgr.ClearSubStack();
+            }
+        }
+
+        public void ReleaseEdgeRefs()
+        {
+            foreach (var edge in _edges)
+            {
+                if (edge.EntityRef != null)
+                {
+                    Marshal.ReleaseComObject(edge.EntityRef);
+                    edge.EntityRef = null;
+                }
             }
         }
     }
