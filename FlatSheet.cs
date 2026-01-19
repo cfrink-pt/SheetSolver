@@ -1,3 +1,4 @@
+using System;
 using System.CodeDom.Compiler;
 
 namespace SheetSolver
@@ -6,7 +7,7 @@ namespace SheetSolver
     {
         public void generate()
         {
-            
+            Console.WriteLine("Test commit");
         }
     }
 }
