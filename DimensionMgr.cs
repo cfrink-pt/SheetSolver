@@ -38,6 +38,7 @@ namespace SheetSolver
         public Entity EntityRef { get; set; }
     }
 
+    // each dimensionmanager instance will be linked to each drawing view.
     class DimensionManager
     {
         public List<dimEdge> _edges;
@@ -134,7 +135,7 @@ namespace SheetSolver
                                     EntityRef = (Entity)swEdge
                                 };
                                 edges.Add(dEdge);
-                                Console.WriteLine($"Edge {count}\r\n  X: {dEdge.X1} | Y: {dEdge.Y1}\r\n  Dx: {dEdge.Dx} | Dy: {dEdge.Dy} | Dz: {dEdge.Dz}");
+                                //Console.WriteLine($"Edge {count}\r\n  X: {dEdge.X1} | Y: {dEdge.Y1}\r\n  Dx: {dEdge.Dx} | Dy: {dEdge.Dy} | Dz: {dEdge.Dz}");
                             }
                             else
                             {
@@ -192,7 +193,7 @@ namespace SheetSolver
 
             return boundEdges;
         }
-        public void DimensionEdges(ApplicationMgr mgr, dimEdge edge1, dimEdge edge2)
+        public void DimensionEdges(ApplicationMgr mgr, dimEdge edge1, dimEdge edge2, double xLoc, double yLoc)
         {
             try
             {
@@ -204,29 +205,7 @@ namespace SheetSolver
                 edge1.EntityRef.Select4(false, null);
                 edge2.EntityRef.Select4(true, null);
         
-                double dimX, dimY;
-                
-                double totalWidth = _xMax - _xMin;
-                double totalHeight = _yMax - _yMin;
-                double offset = Math.Min(totalWidth, totalHeight) / 5.0;
-                
-                // Check if these are horizontal edges (dimensioning Y bounds)
-                bool isHorizontalEdges = Math.Abs(edge1.Dx) > Math.Abs(edge1.Dy);
-                
-                if (isHorizontalEdges)
-                {
-                    // Y bound dimension - place to the left of the part
-                    dimX = _xMin - offset;
-                    dimY = (edge1.Y1 + edge2.Y1) / 2.0;
-                }
-                else
-                {
-                    // X bound dimension - place above the part
-                    dimX = (edge1.X1 + edge2.X1) / 2.0;
-                    dimY = _yMax + offset;
-                }
-        
-                dwDoc.AddDimension2(dimX, dimY, 0);
+                dwDoc.AddDimension2(xLoc, yLoc, 0);
             }
             finally
             {
@@ -237,14 +216,14 @@ namespace SheetSolver
 
         private void StoreBounds(List<dimEdge> edgeStructs)
         {
-            double xMin = 100;
+            double xMin = double.MaxValue;
             foreach (dimEdge edge in edgeStructs)
             {
                 double x = edge.X1;
                 if ( edge.X1 < xMin) xMin = x;
             }
             this._xMin = xMin;
-            Console.WriteLine("Min x value stored = " + this._xMin);
+            //Console.WriteLine("Min x value stored = " + this._xMin);
 
             double xMax = 0;
             foreach (dimEdge edge in edgeStructs)
@@ -253,16 +232,16 @@ namespace SheetSolver
                 if ( edge.X1 > xMax) xMax = x;
             }
             this._xMax = xMax;
-            Console.WriteLine("Max x value stored = " + this._xMax);
+            //Console.WriteLine("Max x value stored = " + this._xMax);
 
-            double yMin = 100;
+            double yMin = double.MaxValue;
             foreach (dimEdge edge in edgeStructs)
             {
                 double y = edge.Y1;
                 if ( edge.Y1 < yMin) yMin = y;
             }
             this._yMin = yMin;
-            Console.WriteLine("Min y value stored = " + this._yMin);
+            //Console.WriteLine("Min y value stored = " + this._yMin);
 
             double yMax = 0;
             foreach (dimEdge edge in edgeStructs)
@@ -271,7 +250,7 @@ namespace SheetSolver
                 if ( edge.Y1 > yMax) yMax = y;
             }
             this._yMax = yMax;
-            Console.WriteLine("Max y value stored = " + this._yMax);
+            //Console.WriteLine("Max y value stored = " + this._yMax);
         }
 
         public double[] TransformModelToSheetSpace(ApplicationMgr mgr, View view, double[] modelCoords)
