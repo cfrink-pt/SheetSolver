@@ -83,12 +83,18 @@ namespace SheetSolver
                     throw new UserCancelledException("User cancelled operation: Unprepared");
                 }
 
-                // we should perform a search of the configurations to validate one exists, then throw an error if not.
-                // TODO: MAKE SURE THE FLAT PATTERN FEATURE IS UNSUPPRESSED.
+
                 ValidateFlatPattern(mgr);
-                // check that properties are filled in on the part.
-                // right now, just validating for scribe value. TODO: EXPAND THIS LOGIC AS NECESSARY. 
                 ValidatePropertiesExist(mgr);
+
+                mgr.PollSheetPreference();
+                mgr.EvaluateSheetPreferences();
+                
+                Console.WriteLine("Proceeding with the following sheets:");
+                foreach ( KeyValuePair<string,bool> kvp in mgr.sheetPreferences)
+                {
+                    Console.WriteLine(kvp.Key + "\r\n " + kvp.Value);
+                }
 
                 // initialize the drawing. this step ends with two views created, standard first page stuff.
                 using (var popup = new LoadingPopup("Initializing drawing..."))
@@ -105,9 +111,13 @@ namespace SheetSolver
 
                 // ========================================================================== //
 
+
+
                 // ========================================================================== //
                 // START SHEET 2 OPERATIONS: FLAT. 
 
+                InsertSheet insertSheet = new InsertSheet();
+                insertSheet.generate(mgr);
 
                 // ========================================================================== //
 

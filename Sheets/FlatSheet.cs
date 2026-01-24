@@ -128,6 +128,17 @@ namespace SheetSolver
                 }
                 EditCell(mgr, coatString, "FEATURES", 4, 1);
 
+                // edit the cell in the features table if we picked an insert/bend/weld sheet.
+                int row = 1;
+                foreach (KeyValuePair<string, bool> kvp in mgr.sheetPreferences)
+                {
+                    if(kvp.Value)
+                    {
+                        EditCell(mgr, "YES", "FEATURES", row, 1);
+                    }
+                    row++;
+                }
+
                 // rebuild to populate terminal blocks.
                 bool ret = swDrawing.ForceRebuild3(false);
             }
