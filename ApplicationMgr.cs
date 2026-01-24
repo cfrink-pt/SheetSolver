@@ -126,7 +126,10 @@ namespace SheetSolver
                 }
                 catch (NullReferenceException)
                 {
+                    // we sneakily tried to find an assembly and we could not find it.
                     // ok, the user was not wrong in their assessment of no valid inserts assembly. Proceed as normal.
+                    this.assyFileDir = "";
+                    this.assyFileName = "";
                 }
             }
 
