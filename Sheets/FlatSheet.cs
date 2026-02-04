@@ -215,7 +215,7 @@ namespace SheetSolver
                 mgr.PushRef(dwgModelDoc);
                 
                 surfAreaViewFeat.Select2(false, 0);
-                dwgModelDoc.DeleteSelection(false);                
+                dwgModelDoc.DeleteSelection(false);    
 
                 // convert the area from square meters to square inches
                 return Math.Round(maxArea*1550.0031, 2);
@@ -351,7 +351,19 @@ namespace SheetSolver
 
                 Dictionary<View, DimensionManager> dimViews = new Dictionary<View, DimensionManager>();
 
-                double firstYVal = 0;
+                DimensionManager initDmgr = new DimensionManager((View)views[0]);
+                initDmgr.ExtractStraightEdgesFromView(mgr, (View)views[0]);
+
+                // this is just storing the offset for the first view and using it universally.
+                dimEdge[] bE = new dimEdge[4];
+                bE = initDmgr.FindBoundEdges();
+
+                double tW = initDmgr._xMax - initDmgr._xMin;
+                double tH = initDmgr._yMax - initDmgr._yMin;
+                double offset = Math.Min(tW, tH) / 5.0;
+
+                initDmgr.ReleaseEdgeRefs();
+
                 int viewIndex = 0;
                 foreach (View view in views)
                 {
@@ -368,39 +380,57 @@ namespace SheetSolver
                         boundEdges = dMgr.FindBoundEdges();
 
                         double dimX, dimY;
-
                         double totalWidth = dMgr._xMax - dMgr._xMin;
                         double totalHeight = dMgr._yMax - dMgr._yMin;
-                        double offset = Math.Min(totalWidth, totalHeight) / 5.0;
 
-                        dimX = (boundEdges[0].X1 + boundEdges[1].X1) / 2.0;
-                        dimY = dMgr._yMax + offset;
-                        if (viewIndex == 0)
+                        // This is where we will dimension views as per index. 
+                        switch(viewIndex)
                         {
-                            firstYVal = dimY;
-                        }
+                            case 0:
+                                Console.WriteLine("Dimensioning View 1");
+                                
+                                dimX = (boundEdges[0].X1 + boundEdges[1].X1) / 2.0;
+                                dimY = dMgr._yMax + offset;
 
-                        if (viewIndex == 1)
-                        {
-                            dimX += 0.01689;
-                            dimY = firstYVal;
-                        }
+                                dMgr.DimensionEdges(
+                                    mgr, 
+                                    boundEdges[0], 
+                                    boundEdges[1], 
+                                    dimX, 
+                                    dimY
+                                    );
 
-                        // left and right edges. 
-                        dMgr.DimensionEdges(mgr, boundEdges[0], boundEdges[1], dimX, dimY);
+                                dimX = dMgr._xMin - offset;
+                                dimY = (boundEdges[2].Y1 + boundEdges[3].Y1) / 2.0;
 
-                        // really shitty to pass a flag here, but its a bandaid solution for the time being.
-                        // this literally just makes the second view not get y bounds dimensioned because we
-                        // dont care about that dim.
-                        // TODO
-                        if (viewIndex == 0)
-                        {
-                            // shitty placement. no constants usually, but this just offsets the second view's dim by .35 inches. 
-                            dimX = dMgr._xMin - offset;
-                            dimY = (boundEdges[2].X1 + boundEdges[3].X1) / 2.0;
-                            // dimension the top and bottom horizontal edges.
-                            // ONLY if we are on the first view. 
-                            dMgr.DimensionEdges(mgr, boundEdges[2], boundEdges[3], dimX, dimY);
+                                dMgr.DimensionEdges(
+                                    mgr, 
+                                    boundEdges[2], 
+                                    boundEdges[3], 
+                                    dimX, 
+                                    dimY
+                                    );
+
+                                break;
+
+                            case 1:
+                                Console.WriteLine("Dimensioning View 2");
+
+                                dimX = ((boundEdges[0].X1 + boundEdges[1].X1) / 2.0 ) + offset*2;
+                                dimY = dMgr._yMax + offset;
+
+                                dMgr.DimensionEdges(
+                                    mgr, 
+                                    boundEdges[0], 
+                                    boundEdges[1], 
+                                    dimX, 
+                                    dimY,
+                                    swTolType_e.swTolSYMMETRIC
+                                    );
+
+                                    // TODO: Why is symmetric not applying properly? 
+
+                                break;
                         }
                         
                         dMgr.ReleaseEdgeRefs();

@@ -166,7 +166,10 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
-
+        /// <summary>
+        ///  Fetch array of dimEdge objects containing the bounds of the view's part/assy.
+        ///  [ 0 : Left Edge, 1 : Right Edge, 2 : Bottom Edge, 3 : Top Edge ]
+        /// </summary>
         public dimEdge[] FindBoundEdges()
         {
             dimEdge[] boundEdges = new dimEdge[4];
@@ -193,7 +196,7 @@ namespace SheetSolver
 
             return boundEdges;
         }
-        public void DimensionEdges(ApplicationMgr mgr, dimEdge edge1, dimEdge edge2, double xLoc, double yLoc)
+        public void DimensionEdges(ApplicationMgr mgr, dimEdge edge1, dimEdge edge2, double xLoc, double yLoc, swTolType_e? tolType = 0)
         {
             try
             {
@@ -204,8 +207,28 @@ namespace SheetSolver
                 
                 edge1.EntityRef.Select4(false, null);
                 edge2.EntityRef.Select4(true, null);
-        
-                dwDoc.AddDimension2(xLoc, yLoc, 0);
+
+                switch (tolType.HasValue && tolType != 0)
+                {
+                    case true:
+                        DisplayDimension dim = (DisplayDimension)dwDoc.AddDimension2(xLoc, yLoc, 0);
+                        mgr.PushRef(dim);
+
+                        Dimension d = dim.GetDimension2(0);
+                        mgr.PushRef(d);
+
+                        d.SetToleranceType((int)tolType);
+                        
+                        DimensionTolerance dTol = d.Tolerance;
+                        mgr.PushRef(dTol);
+                        
+                        dTol.SetValues2(0, 0.010, (int)swSetValueInConfiguration_e.swSetValue_InAllConfigurations, null);                        
+                        break;
+
+                    case false:
+                        dwDoc.AddDimension2(xLoc, yLoc, 0);
+                        break;
+                }
             }
             finally
             {
