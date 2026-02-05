@@ -16,10 +16,14 @@ namespace SheetSolver
         public string partFileDir { get; set; }
         public string assyFileName { get; set; }
         public string assyFileDir { get; set; }
+        
+        // drawing format in meters
         public double drawingX = 0.2794;
         public double drawingY = 0.2159;
+
         public string drawingTemplate = @"\\storage\CAD\Solidworks\Phase Setting files\Templates\Phase Drawing, 4.0.drwdot";
         public string viewName = "TempView";
+        public int currentSheetIndex { get; set; }
         public Stack<object> mainComStack = new Stack<object>();
         public Stack<object> subStack = new Stack<object>();
         public SldWorks App { get; set; }
@@ -90,6 +94,7 @@ namespace SheetSolver
             else
             {
                 // do some sneaky checks to see if they can and should make an insert sheet but didnt.
+                // this should probably not exist tbh, but we will keep it. it is flashy : ) hehe
                 string thisFile = Doc.GetPathName();
 
                 var thisInfo = new FileInfo(thisFile);
@@ -289,7 +294,6 @@ namespace SheetSolver
                 throw new InvalidOperationException("No Active Document.");
             }
         }
-
         public bool VerifyDocType(swDocumentTypes_e docType)
         {
             bool result = false;
@@ -301,7 +305,6 @@ namespace SheetSolver
 
             return result;
         }
-
         public void PushRef(object o)
         {
             if (o != null)
@@ -314,7 +317,6 @@ namespace SheetSolver
                 throw new NullReferenceException("Null references pushed to substack");
             }
         }
-
         public void ClearSubStack()
         {
             if (this.subStack.Count == 0)  // check count instead of Peek()
@@ -331,7 +333,6 @@ namespace SheetSolver
                 }
             }
         }
-
         public void TearDown()
         {
             while (mainComStack.Count > 0)

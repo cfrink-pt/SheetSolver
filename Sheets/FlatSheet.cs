@@ -416,7 +416,7 @@ namespace SheetSolver
                             case 1:
                                 Console.WriteLine("Dimensioning View 2");
 
-                                dimX = ((boundEdges[0].X1 + boundEdges[1].X1) / 2.0 ) + offset*2;
+                                dimX = ((boundEdges[0].X1 + boundEdges[1].X1) / 2.0 ) + .02125;
                                 dimY = dMgr._yMax + offset;
 
                                 dMgr.DimensionEdges(

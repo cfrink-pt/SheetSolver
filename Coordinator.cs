@@ -101,6 +101,9 @@ namespace SheetSolver
                 {
                     popup.Show();
                     InitializeDrawingFromPartDoc(mgr);
+
+                    // we can now verify we are on sheet index 0.
+                    mgr.currentSheetIndex = 0;
                 }
 
                 // ========================================================================== //
@@ -111,20 +114,46 @@ namespace SheetSolver
 
                 // ========================================================================== //
 
+                // move to next sheet for generation.
+                DrawingDoc drawing = (DrawingDoc)mgr.App.ActiveDoc;
+                drawing.SheetNext();
+                mgr.PushRef(drawing);
+
+                // ========================================================================== //
+                // START SHEET 2 OPERATIONS: INSERT. 
+
+                if (mgr.sheetPreferences["Insert"])
+                {
+                    InsertSheet insertSheet = new InsertSheet();
+                    insertSheet.generate(mgr);
+                }
+                else
+                {
+                    Console.WriteLine("Skipping Insert Sheet..");
+                }
+                
+                // ========================================================================== //
 
 
                 // ========================================================================== //
-                // START SHEET 2 OPERATIONS: FLAT. 
+                // START SHEET 3 OPERATIONS: BEND. 
 
-                InsertSheet insertSheet = new InsertSheet();
-                insertSheet.generate(mgr);
-
+                if (mgr.sheetPreferences["Bend"])
+                {
+                    BendSheet bendSheet = new BendSheet();
+                    bendSheet.generate(mgr);
+                }
+                else
+                {
+                    Console.WriteLine("Skipping Bend Sheet..");
+                }
+                
                 // ========================================================================== //
-
             }
             finally
             {
-                Console.WriteLine("Tearing Down Main...");
+                Console.WriteLine("Tearing Down Main & Substack...");
+                mgr.ClearSubStack();
                 mgr.TearDown();
             }
         }
