@@ -297,7 +297,7 @@ namespace SheetSolver
                 throw new InvalidOperationException($"UpdateProperty() tried to update {propertyName}, but it did not exist within the property list.");
             }
         }
-        public void EditCell(ApplicationMgr mgr, string cellInput, string targetString, int rowId, int colID)
+        public static void EditCell(ApplicationMgr mgr, string cellInput, string targetString, int rowId, int colID)
         {
             try
             {

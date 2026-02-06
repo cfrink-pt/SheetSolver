@@ -3,6 +3,8 @@ using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading;
 
 using View = SolidWorks.Interop.sldworks.View;
 using FormsView = System.Windows.Forms.View;
@@ -83,12 +85,13 @@ namespace SheetSolver
                     throw new UserCancelledException("User cancelled operation: Unprepared");
                 }
 
-
                 ValidateFlatPattern(mgr);
                 ValidatePropertiesExist(mgr);
 
                 mgr.PollSheetPreference();
                 mgr.EvaluateSheetPreferences();
+
+                Console.WriteLine($"DEBUG: Assy file name: {mgr.assyFileName}\r\nAssy file dir: {mgr.assyFileDir}");
                 
                 Console.WriteLine("Proceeding with the following sheets:");
                 foreach ( KeyValuePair<string,bool> kvp in mgr.sheetPreferences)
@@ -290,7 +293,8 @@ namespace SheetSolver
                 {
                     throw new InvalidOperationException("No valid flat pattern configuration found. Please create a flat pattern configuration titled \"SM-FLAT-PATTERN\" with the flat pattern feature unsuppressed.");
                 }
-
+                
+                mgr.flatConfigurationName = flatConfigName;
                 mgr.Doc.ShowConfiguration2(flatConfigName);
             }
             finally
@@ -306,6 +310,66 @@ namespace SheetSolver
                 // Create the drawingdoc reference. Push it to the substack for cleanup later.
                 DrawingDoc swDrawing = mgr.CreateAndMoveToDrawing();
                 mgr.PushRef(swDrawing);
+
+                // now we are going to save this drawing and store the path.
+                var choice = MessageBox.Show(
+                    "Save at part's directory?", 
+                    "Save Location", 
+                    MessageBoxButtons.YesNo
+                );
+
+                string saveDir;
+
+                if (choice == DialogResult.Yes)
+                {
+                    string drawingFileName = Path.ChangeExtension(mgr.partFileName, ".SLDDRW");
+                    saveDir = Path.Combine(mgr.partFileDir, drawingFileName);
+                }
+                else
+                {
+                    // Browse for new directory
+                    string selectedDir = null;
+
+                    var thread = new Thread(() =>
+                    {
+                        using var folderDialog = new FolderBrowserDialog
+                        {
+                            Description = "Select Save Directory",
+                            SelectedPath = Path.GetDirectoryName(mgr.drawingDocPath) ?? ""
+                        };
+
+                        if (folderDialog.ShowDialog() == DialogResult.OK)
+                        {
+                            selectedDir = folderDialog.SelectedPath;
+                        }
+                    });
+
+                    thread.SetApartmentState(ApartmentState.STA);
+                    thread.Start();
+                    thread.Join();
+
+                    if (selectedDir == null)
+                    {
+                        throw new UserCancelledException("User cancelled directory selection.");
+                    }
+
+                    string drawingFileName = Path.ChangeExtension(mgr.partFileName, ".SLDDRW");
+                    saveDir = Path.Combine(selectedDir, drawingFileName);
+
+                    mgr.drawingDocPath = saveDir;
+                }
+
+                int e = 0;
+                int w = 0;
+                ModelDoc2 dDoc = (ModelDoc2)mgr.App.ActiveDoc;
+                mgr.PushRef(dDoc);
+                bool saveResult = dDoc.SaveAs4(saveDir, (int)swSaveAsVersion_e.swSaveAsCurrentVersion, (int)swSaveAsOptions_e.swSaveAsOptions_Silent, ref e, ref w);
+
+
+                if (!saveResult)
+                {
+                    Console.WriteLine($"SaveAs4 FAILED — error: {e}, warning: {w}, path: {saveDir}");
+                }
 
                 // Create the view from model view
                 View mainView = swDrawing.CreateDrawViewFromModelView3(mgr.Doc.GetTitle(), mgr.viewName, mgr.drawingX/2, mgr.drawingY/2, 0);

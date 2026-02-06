@@ -6,16 +6,21 @@ using System.Collections.Generic;
 using System;
 using SolidWorks.Interop.swconst;
 using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace SheetSolver
 {
     public class ApplicationMgr
     {
         public Dictionary<string, bool> sheetPreferences { get; set; }
+        public string drawingDocPath { get; set; }
         public string partFileName { get; set; }
         public string partFileDir { get; set; }
         public string assyFileName { get; set; }
         public string assyFileDir { get; set; }
+        public string insertView1 = "iView1";
+        public string insertView2 = "iView2";
+        public string flatConfigurationName { get; set; }
         
         // drawing format in meters
         public double drawingX = 0.2794;
@@ -51,6 +56,32 @@ namespace SheetSolver
                 { "Weld", false}
             };
         }
+        /// <summary>
+        /// Searches for and returns the first sheet metal part pointer with part number H______. 
+        /// </summary>
+        public Component2 FetchSheetMetalInAssy()
+        {
+            AssemblyDoc swAssy = (AssemblyDoc)App.ActiveDoc;
+            PushRef(swAssy);
+
+            object[] comps = (object[])swAssy.GetComponents(false);
+
+            Component2 swCompModel = null;
+
+            foreach (object obj in comps)
+            {
+                Component2 swComp = (Component2)obj;
+                PushRef(swComp);
+                // actual filter.
+                if (Regex.IsMatch(swComp.Name2, @"^H\d{5}\b", RegexOptions.IgnoreCase))
+                {
+                    swCompModel = swComp;
+                    break;
+                }
+            }
+
+            return swCompModel;
+        } 
 
         /// <summary>
         ///  Presents the user with options for which sheets this part requires. Stores resulting values within mgr.sheetPreferences.
@@ -272,10 +303,9 @@ namespace SheetSolver
                 }
             }
         }
-
         public DrawingDoc CreateAndMoveToDrawing()
         {
-            this.Doc.NameView(this.viewName);
+            this.Doc.NameView(this. viewName);
             this.App.NewDocument(this.drawingTemplate, 0, 0, 0);
 
             DrawingDoc swDrawing = (DrawingDoc)this.App.ActiveDoc;
