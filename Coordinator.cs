@@ -10,8 +10,11 @@ using View = SolidWorks.Interop.sldworks.View;
 using FormsView = System.Windows.Forms.View;
 
 
-namespace SheetSolver.Coordinator
+namespace SheetSolver
 {
+    /// <summary>
+    /// Displays a loading popup.
+    /// </summary>
     public class LoadingPopup : IDisposable
     {
         private Form _form;
