@@ -10,7 +10,7 @@ using View = SolidWorks.Interop.sldworks.View;
 using FormsView = System.Windows.Forms.View;
 
 
-namespace SheetSolver
+namespace SheetSolver.Coordinator
 {
     public class LoadingPopup : IDisposable
     {
@@ -137,6 +137,11 @@ namespace SheetSolver
                 
                 // ========================================================================== //
 
+                // TEST CODE HERE
+                DrawingDoc ddoc = (DrawingDoc)mgr.App.ActiveDoc;
+                ViewPlacementMgr vpm = new ViewPlacementMgr((Sheet)ddoc.GetCurrentSheet());
+
+                vpm.PlaceView(mgr, mgr.drawingX/2, mgr.drawingY/2);
 
                 // ========================================================================== //
                 // START SHEET 3 OPERATIONS: BEND. 
@@ -158,6 +163,7 @@ namespace SheetSolver
                 Console.WriteLine("Tearing Down Main & Substack...");
                 mgr.ClearSubStack();
                 mgr.TearDown();
+                Console.WriteLine($"(coordinator) Sheet metal quantity = {mgr.sheetMaterialQty}");
             }
         }
 
@@ -324,6 +330,8 @@ namespace SheetSolver
                 {
                     string drawingFileName = Path.ChangeExtension(mgr.partFileName, ".SLDDRW");
                     saveDir = Path.Combine(mgr.partFileDir, drawingFileName);
+
+                    mgr.drawingDocPath = saveDir;
                 }
                 else
                 {

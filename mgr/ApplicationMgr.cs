@@ -25,6 +25,8 @@ namespace SheetSolver
         // drawing format in meters
         public double drawingX = 0.2794;
         public double drawingY = 0.2159;
+        // sheet metal quantity based on area
+        public double sheetMaterialQty { get; set; }
 
         public string drawingTemplate = @"\\storage\CAD\Solidworks\Phase Setting files\Templates\Phase Drawing, 4.0.drwdot";
         public string viewName = "TempView";
@@ -171,7 +173,7 @@ namespace SheetSolver
 
             if (sheetPreferences["Bend"])
             {
-                
+                sheetPreferences["Bend"] = true;
             }
             if (sheetPreferences["Weld"])
             {

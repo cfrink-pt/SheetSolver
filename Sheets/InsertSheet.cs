@@ -127,20 +127,22 @@ namespace SheetSolver
             // clean up for pre-ops.
             mgr.ClearSubStack();
 
+
+
             using (var popup = new LoadingPopup("Populating Title Block..."))
             {
                 popup.Show();
                 PopulateTitleBlock(mgr);
             }
-            using (var popup = new LoadingPopup("Placing Inserts View..."))
-            {
-                popup.Show();
-                PlaceInsertViews(mgr, doDoubleInsert);
-            }
             using (var popup = new LoadingPopup("Creating Inserts Table..."))
             {
                 popup.Show();
                 CreateInsertTable(mgr);
+            }
+            using (var popup = new LoadingPopup("Placing Inserts View..."))
+            {
+                popup.Show();
+                PlaceInsertViews(mgr, doDoubleInsert);
             }
         }
 
@@ -163,7 +165,24 @@ namespace SheetSolver
                 mgr.ClearSubStack();
             }
         }
+        public void CreateInsertTable(ApplicationMgr mgr)
+        {
+            try
+            {
+                DrawingDoc swDrawing = (DrawingDoc)mgr.App.ActiveDoc;
+                mgr.PushRef(swDrawing);
 
+                TableAnnotation table = swDrawing.InsertTableAnnotation2(false, 0.01416083, .206895, (int)swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft, @"\\storage\CAD\Solidworks\Phase Setting files\Templates\INSERT TABLE.sldtbt", 2, 5);
+                mgr.PushRef(table);
+
+                //FlatSheet.EditCell(mgr, "TestVal", "ITEM NO.", 1, 0);
+            }
+            finally
+            {
+                Console.WriteLine("Tearing down substack... (CreateInsertTable)");
+                mgr.ClearSubStack();
+            }
+        }
         public void PlaceInsertViews(ApplicationMgr mgr, bool doDoubleInsert)
         {
             try
@@ -180,25 +199,6 @@ namespace SheetSolver
             finally
             {
                 Console.WriteLine("Tearing down substack... (PlaceInsertViews)");
-                mgr.ClearSubStack();
-            }
-        }
-
-        public void CreateInsertTable(ApplicationMgr mgr)
-        {
-            try
-            {
-                DrawingDoc swDrawing = (DrawingDoc)mgr.App.ActiveDoc;
-                mgr.PushRef(swDrawing);
-
-                TableAnnotation table = swDrawing.InsertTableAnnotation2(false, 0.01416083, .206895, (int)swBOMConfigurationAnchorType_e.swBOMConfigurationAnchor_TopLeft, @"\\storage\CAD\Solidworks\Phase Setting files\Templates\INSERT TABLE.sldtbt", 2, 5);
-                mgr.PushRef(table);
-
-                //FlatSheet.EditCell(mgr, "TestVal", "ITEM NO.", 1, 0);
-            }
-            finally
-            {
-                Console.WriteLine("Tearing down substack... (CreateInsertTable)");
                 mgr.ClearSubStack();
             }
         }

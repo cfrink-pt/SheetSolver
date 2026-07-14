@@ -24,11 +24,13 @@ namespace SheetSolver
                 PopulateProperties(mgr, pMgr);
             }
 
+            /*
             using (var popup = new LoadingPopup("Dimensioning views..."))
             {
                 popup.Show();
                 DimViewsFlat(mgr);
             }
+            */
         }
 
         // ========================================================================== //
@@ -136,6 +138,10 @@ namespace SheetSolver
                     {
                         EditCell(mgr, "YES", "FEATURES", row, 1);
                     }
+                    else
+                    {
+                        EditCell(mgr, "NO", "FEATURES", row, 1);
+                    }
                     row++;
                 }
 
@@ -217,8 +223,14 @@ namespace SheetSolver
                 surfAreaViewFeat.Select2(false, 0);
                 dwgModelDoc.DeleteSelection(false);    
 
+                double sqInch = Math.Round(maxArea*1550.0031, 2);
+
+                double sheetMaterialQty = ( sqInch / 576 / 0.705 ) + 0.00632;
+
+                mgr.sheetMaterialQty = sheetMaterialQty;
+
                 // convert the area from square meters to square inches
-                return Math.Round(maxArea*1550.0031, 2);
+                return sqInch;
             }
             finally
             {

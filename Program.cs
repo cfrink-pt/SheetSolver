@@ -10,6 +10,7 @@ namespace SheetSolver
         public UserCancelledException(string message) : base(message) { }
     }
 
+
     class Program
     {
         static void Main(string[] args)
